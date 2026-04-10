@@ -1,129 +1,138 @@
-# Setup-PARA.ps1
-# Automates creation of a PARA-structured development environment with
-# directory scaffolding, README templates, starter files, and Git initialization.
+<#
+.SYNOPSIS
+    Creates a full PARA development structure with README templates,
+    starter files, and optional Git initialization.
+
+.DESCRIPTION
+    This script:
+      - Builds an ordered PARA folder hierarchy
+      - Creates README.md templates with metadata
+      - Generates starter files based on folder semantics
+      - Initializes Git repos only in Projects + Areas
+      - Performs a silent Git capability check
+      - Logs all actions cleanly and consistently
+
+.PARAMETER RootPath
+    The root directory where PARA will be created.
+    Defaults to $HOME\Dev.
+
+.EXAMPLE
+    .\Setup-PARA.ps1
+    .\Setup-PARA.ps1 -RootPath "C:\MyDev"
+#>
 
 param(
     [string]$RootPath = "$HOME\Dev"
 )
 
-# ---------------------------------------------------------------------------
-# PARA structure definition
-# ---------------------------------------------------------------------------
-$folders = [ordered]@{
-    "1_Projects"  = @(
-        "EdX_Python_Course",
-        "Personal_AI_Lexicon",
-        "Portfolio_Website"
-    )
-    "2_Areas"     = @(
-        "Automation_Scripts",
-        "Snippets_HTML_CSS",
-        "DevOps_Docker"
-    )
-    "3_Resources" = @(
-        "Learning\Python_Fundamentals",
-        "Learning\Algorithms",
-        "Learning\JavaScript_Active_Recall",
-        "Sandboxes\Throwaway_Code",
-        "Libraries\Components"
-    )
-    "4_Archive"   = @(
-        "Legacy_Tutorials",
-        "Old_Experiments"
-    )
+# -----------------------------
+# Utility: Timestamp
+# -----------------------------
+function New-Timestamp {
+    return (Get-Date -Format "yyyy-MM-dd")
 }
 
-# ---------------------------------------------------------------------------
-# Git availability check
-# ---------------------------------------------------------------------------
-$gitAvailable = $false
-try {
-    git --version 2>&1 | Out-Null
-    $gitAvailable = $true
-} catch {
-    Write-Host "Git not found – repository initialization will be skipped." -ForegroundColor Yellow
+# -----------------------------
+# Utility: Write formatted logs
+# -----------------------------
+function Log {
+    param([string]$Message)
+    Write-Host "[PARA] $Message"
 }
 
-# ---------------------------------------------------------------------------
-# Helper: Generate README.md
-# ---------------------------------------------------------------------------
-function New-ReadMe {
+# -----------------------------
+# Git capability check
+# -----------------------------
+function Test-Git {
+    try {
+        git --version *>$null
+        return $true
+    } catch {
+        Log "Git not found — skipping Git initialization."
+        return $false
+    }
+}
+
+$GitAvailable = Test-Git
+
+# -----------------------------
+# PARA Structure Definition
+# -----------------------------
+$Folders = [ordered]@{
+    "1_Projects"  = @("Python", "JavaScript", "Web", "C++", "Docker")
+    "2_Areas"     = @("Learning", "Career", "Systems")
+    "3_Resources" = @("Notes", "References")
+    "4_Archives"  = @("Old_Projects", "Old_Notes")
+}
+
+# -----------------------------
+# README Template Generator
+# -----------------------------
+function New-Readme {
     param(
-        [string]$FolderPath,
-        [string]$FolderName,
-        [string]$ParaCategory
+        [string]$Path,
+        [string]$Category
     )
 
-    $date    = Get-Date -Format "yyyy-MM-dd"
-    $content = @"
-# $FolderName
-
-**Created:** $date  
-**PARA Category:** $ParaCategory
-
----
+    $Content = @"
+# $(Split-Path $Path -Leaf)
+**Created:** $(New-Timestamp)  
+**Category:** $Category  
 
 ## Purpose
+Describe the purpose of this folder.
 
-<!-- Describe the goal of this project / resource here. -->
-
-## Notes / Active Recall
-
-<!-- Add key takeaways, questions, and reminders here. -->
+## Active Recall
+- What is the main objective here?
+- What is the next action?
 "@
-    Set-Content -Path (Join-Path $FolderPath "README.md") -Value $content -Encoding UTF8
+
+    Set-Content -Path (Join-Path $Path "README.md") -Value $Content -Encoding UTF8
 }
 
-# ---------------------------------------------------------------------------
-# Helper: Generate context-aware starter files
-# ---------------------------------------------------------------------------
+# -----------------------------
+# Starter File Generator
+# -----------------------------
 function New-StarterFiles {
-    param(
-        [string]$FolderPath,
-        [string]$FolderName
-    )
+    param([string]$Path)
 
-    switch -Regex ($FolderName) {
+    $Name = Split-Path $Path -Leaf
+
+    switch -Regex ($Name) {
 
         # Python
-        "(?i)python|algo" {
-            $py = @"
-def main():
-    print("Hello from $FolderName!")
-
-if __name__ == "__main__":
-    main()
-"@
-            Set-Content -Path (Join-Path $FolderPath "main.py") -Value $py -Encoding UTF8
+        "(?i)python" {
+            Set-Content -Path (Join-Path $Path "main.py") `
+                -Value 'print("Hello from Python!")' -Encoding UTF8
             break
         }
 
         # JavaScript
-        "(?i)javascript|js|recall" {
-            $js = 'console.log("' + $FolderName + ' initialized.");'
-            Set-Content -Path (Join-Path $FolderPath "index.js") -Value $js -Encoding UTF8
+        "(?i)javascript" {
+            Set-Content -Path (Join-Path $Path "index.js") `
+                -Value 'console.log("Hello from JavaScript!");' -Encoding UTF8
             break
         }
 
         # Web (HTML / CSS / Portfolio)
-        "(?i)html|css|portfolio|web|snippet" {
+        "(?i)html|css|portfolio|web" {
             $html = @"
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>$FolderName</title>
+    <title>$Name</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>$FolderName</h1>
+    <h1>$Name</h1>
     <script src="script.js"></script>
 </body>
 </html>
 "@
             $css = @"
-/* $FolderName styles */
+/* $Name styles */
 * {
     box-sizing: border-box;
     margin: 0;
@@ -134,30 +143,28 @@ body {
     font-family: sans-serif;
 }
 "@
-            $js = "// $FolderName scripts"
-
-            Set-Content -Path (Join-Path $FolderPath "index.html")  -Value $html -Encoding UTF8
-            Set-Content -Path (Join-Path $FolderPath "style.css")   -Value $css  -Encoding UTF8
-            Set-Content -Path (Join-Path $FolderPath "script.js")   -Value $js   -Encoding UTF8
+            Set-Content -Path (Join-Path $Path "index.html") -Value $html -Encoding UTF8
+            Set-Content -Path (Join-Path $Path "style.css")  -Value $css  -Encoding UTF8
+            Set-Content -Path (Join-Path $Path "script.js")  -Value "// $Name scripts" -Encoding UTF8
             break
         }
 
         # C++
-        "(?i)cpp|c\+\+" {
+        "(?i)c\+\+|cpp" {
             $cpp = @"
 #include <iostream>
 
 int main() {
-    std::cout << "Hello from $FolderName!" << std::endl;
+    std::cout << "Hello from $Name!" << std::endl;
     return 0;
 }
 "@
-            Set-Content -Path (Join-Path $FolderPath "main.cpp") -Value $cpp -Encoding UTF8
+            Set-Content -Path (Join-Path $Path "main.cpp") -Value $cpp -Encoding UTF8
             break
         }
 
         # Docker
-        "(?i)docker|devops|container" {
+        "(?i)docker" {
             $dockerfile = @"
 FROM ubuntu:22.04
 
@@ -172,66 +179,60 @@ WORKDIR /app
 # Define entry point
 # CMD ["bash"]
 "@
-            Set-Content -Path (Join-Path $FolderPath "Dockerfile") -Value $dockerfile -Encoding UTF8
+            Set-Content -Path (Join-Path $Path "Dockerfile") -Value $dockerfile -Encoding UTF8
             break
         }
     }
 }
 
-# ---------------------------------------------------------------------------
-# Main loop – create directories, README, starter files, and Git repos
-# ---------------------------------------------------------------------------
-Write-Host ""
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  PARA Development Environment Setup   " -ForegroundColor Cyan
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host ""
+# -----------------------------
+# Main loop
+# -----------------------------
+Log "========================================="
+Log "  PARA Development Environment Setup"
+Log "========================================="
 
-foreach ($category in $folders.Keys) {
+foreach ($Category in $Folders.Keys) {
 
-    $categoryPath = Join-Path $RootPath $category
+    $CategoryPath = Join-Path $RootPath $Category
 
-    if (-not (Test-Path $categoryPath)) {
-        New-Item -ItemType Directory -Path $categoryPath | Out-Null
-        Write-Host "[+] Created category: $category" -ForegroundColor Green
+    if (-not (Test-Path $CategoryPath)) {
+        New-Item -ItemType Directory -Path $CategoryPath | Out-Null
+        Log "[+] Created category: $Category"
     } else {
-        Write-Host "[ ] Category exists:  $category" -ForegroundColor DarkGray
+        Log "[ ] Category exists:  $Category"
     }
 
-    foreach ($subfolder in $folders[$category]) {
+    foreach ($Subfolder in $Folders[$Category]) {
 
-        $subfolderPath = Join-Path $categoryPath $subfolder
-        $leafName      = Split-Path $subfolder -Leaf
+        $SubfolderPath = Join-Path $CategoryPath $Subfolder
 
-        if (-not (Test-Path $subfolderPath)) {
-            New-Item -ItemType Directory -Path $subfolderPath | Out-Null
-            Write-Host "    [+] Created: $subfolder" -ForegroundColor Green
+        if (-not (Test-Path $SubfolderPath)) {
+            New-Item -ItemType Directory -Path $SubfolderPath | Out-Null
+            Log "    [+] Created: $Subfolder"
 
             # README template
-            New-ReadMe -FolderPath $subfolderPath -FolderName $leafName -ParaCategory $category
+            New-Readme -Path $SubfolderPath -Category $Category
 
             # Context-aware starter files
-            New-StarterFiles -FolderPath $subfolderPath -FolderName $leafName
+            New-StarterFiles -Path $SubfolderPath
 
             # Git initialization for Projects and Areas only
-            if ($gitAvailable -and ($category -eq "1_Projects" -or $category -eq "2_Areas")) {
-                Push-Location $subfolderPath
+            if ($GitAvailable -and ($Category -eq "1_Projects" -or $Category -eq "2_Areas")) {
+                Push-Location $SubfolderPath
                 git init --quiet
                 Pop-Location
-                Write-Host "        [git] Repository initialized in $leafName" -ForegroundColor Magenta
+                Log "        [git] Repository initialized in $(Split-Path $Subfolder -Leaf)"
             }
 
         } else {
-            Write-Host "    [ ] Exists:   $subfolder" -ForegroundColor DarkGray
+            Log "    [ ] Exists:   $Subfolder"
         }
     }
-
-    Write-Host ""
 }
 
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  Lexicon setup complete!              " -ForegroundColor Cyan
-Write-Host "  Your PARA development environment    " -ForegroundColor Cyan
-Write-Host "  is now aligned with your framework.  " -ForegroundColor Cyan
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host ""
+Log "========================================="
+Log "  Lexicon setup complete!"
+Log "  Your PARA development environment"
+Log "  is now aligned with your framework."
+Log "========================================="
