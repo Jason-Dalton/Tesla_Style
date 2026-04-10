@@ -100,7 +100,7 @@ if __name__ == "__main__":
 
         # JavaScript
         "(?i)javascript|js|recall" {
-            $js = "console.log(`"$FolderName initialized.`");"
+            $js = 'console.log("' + $FolderName + ' initialized.");'
             Set-Content -Path (Join-Path $FolderPath "index.js") -Value $js -Encoding UTF8
             break
         }
