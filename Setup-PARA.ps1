@@ -222,7 +222,7 @@ foreach ($Category in $Folders.Keys) {
                 Push-Location $SubfolderPath
                 git init --quiet
                 Pop-Location
-                Log "        [git] Repository initialized in $(Split-Path $Subfolder -Leaf)"
+                Log "        [git] Repository initialized in $Subfolder"
             }
 
         } else {
